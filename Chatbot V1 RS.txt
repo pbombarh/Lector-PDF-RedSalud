@@ -1,0 +1,45 @@
+import os
+import fitz  # PyMuPDF
+import streamlit as st
+from langchain_community.llms import OpenAI
+from langchain.chains.question_answering import load_qa_chain
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.docstore.document import Document
+from dotenv import load_dotenv
+
+# Carga la API Key
+api_key = "sk-API KEY"
+if not api_key:
+    st.error("No se encontró la API key. Verifica que esté en el archivo .env.")
+    st.stop()
+
+# Función para leer texto desde PDF
+def read_pdf(file):
+    doc = fitz.open(stream=file.read(), filetype="pdf")
+    text = ""
+    for page in doc:
+        text += page.get_text()
+    return text
+
+# Interfaz con Streamlit
+st.set_page_config(page_title="Chatbot PDF", layout="centered")
+st.title("🤖 Chatbot de Seguros RedSalud")
+
+uploaded_file = st.file_uploader("📄 Sube el PDF del plan", type=["pdf"])
+
+if uploaded_file:
+    with st.spinner("Analizando el documento..."):
+        raw_text = read_pdf(uploaded_file)
+        splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        texts = splitter.split_text(raw_text)
+        docs = [Document(page_content=t) for t in texts]
+
+    question = st.text_input("❓ ¿Qué quieres preguntar sobre el PDF?")
+
+    if question:
+        llm = OpenAI(openai_api_key=api_key, temperature=0)
+        chain = load_qa_chain(llm, chain_type="stuff")
+        with st.spinner("Pensando..."):
+            answer = chain.run(input_documents=docs, question=question)
+        st.success("✅ Respuesta:")
+        st.write(answer)
